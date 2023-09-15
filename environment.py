@@ -31,6 +31,15 @@ class TradingEnvironment:
 
         self.share_optimizer = DynamicShareCalculator()
 
+    def get_state(self):
+        states_list = [self.cr.iloc[self.current_step], self.cr.iloc[self.current_step],
+                       self.volume_oscillator.iloc[self.current_step],
+                       self.bollinger_percent.iloc[self.current_step],
+                       self.macd_signal.iloc[self.current_step],
+                       self.current_cash, self.stock_owned]
+
+        return states_list
+
     def reset(self):
         """Reset the trading environment to the initial state."""
         self.current_step = 0
@@ -49,8 +58,8 @@ class TradingEnvironment:
             float: The reward for the current step.
             bool: Whether the episode is done.
         """
-        TRANSACTION_COST = 1.0
-        HOLD_PENALTY = -0.01
+        TRANSACTION_COST = 0.0
+        HOLD_PENALTY = -0.1
         reward = 0
 
         current_portfolio_value = self.current_cash + self.stock_owned * self.stock_price.iloc[self.current_step - 1]
@@ -76,7 +85,8 @@ class TradingEnvironment:
                 reward += buy_reward* 10
 
             else:
-                reward = -10  # Penalty for invalid action
+                self.shares = 0
+                reward -= 10  # Penalty for invalid action
 
         elif action == 1:  # Sell
             self.shares = self.share_optimizer.shares_to_sell(
@@ -96,15 +106,17 @@ class TradingEnvironment:
                 reward += sell_reward* 10
 
             else:
-                reward = -10  # Penalty for invalid action
+                self.shares = 0
+                reward -= 10  # Penalty for invalid action
 
         elif action == 2:  # Hold
-            hold_reward = (1 - abs(potential_change) / self.stock_price.iloc[self.current_step - 1])
+            #hold_reward = (1 - abs(potential_change) / self.stock_price.iloc[self.current_step - 1])
+            hold_reward = HOLD_PENALTY
             reward += hold_reward* 10
 
         next_portfolio_value = self.current_cash + self.stock_owned * self.stock_price.iloc[self.current_step]
 
-        reward += 10 * (self.stock_price.iloc[self.current_step] - self.stock_price.iloc[self.current_step - 1]) / self.stock_price.iloc[self.current_step - 1]
+        reward += 10 * (next_portfolio_value - self.portfolio_value) / self.portfolio_value
 
         tracker.loc[len(tracker), tracker.columns] = {'Step': self.current_step, 'Buy_reward': buy_reward,
                                                       'Sell_reward': sell_reward,

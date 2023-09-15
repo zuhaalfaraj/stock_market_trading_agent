@@ -1,3 +1,5 @@
+import numpy as np
+
 from trading_agent import DQAgent
 import torch
 import pandas as pd
@@ -22,9 +24,14 @@ class TrainAgent:
         device (str): Device used for training ('cuda' or 'cpu').
     """
 
-    def __init__(self, env, input_dim, action_dim, episodes):
+    def __init__(self, env, action_dim, episodes,
+                 hidden_dim=128, gamma=0.99, epsilon=0.9, epsilon_min=0.01,
+                 epsilon_decay=0.999, lr=0.0000001
+                 ):
         self.env = env
-        self.agent = DQAgent(input_dim=input_dim, action_dim=action_dim)
+        self.agent = DQAgent(input_dim=len(env.get_state()), action_dim=action_dim,
+                             hidden_dim=hidden_dim, gamma=gamma, epsilon=epsilon, epsilon_min=epsilon_min,
+                             epsilon_decay=epsilon_decay, lr=lr)
         self.episodes = episodes
         self.best_reward = -float('inf')
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -38,12 +45,6 @@ class TrainAgent:
         """
         for e in range(self.episodes):
             self.env.reset()
-            states_list = [self.env.cr.iloc[self.env.current_step], self.env.volume_oscillator.iloc[self.env.current_step],
-                           self.env.bollinger_percent.iloc[self.env.current_step],
-                           self.env.macd_signal.iloc[self.env.current_step],
-                           self.env.current_cash, self.env.stock_owned]
-            state = torch.Tensor(states_list).unsqueeze(0).to(self.device)
-
             done = False
             total_trades = 0
             total_reward = 0
@@ -58,7 +59,12 @@ class TrainAgent:
 
             buy_sell = [0, 0]
             current_return = self.env.current_cash
+
+            states_list = self.env.get_state()
+            state = torch.Tensor(states_list).unsqueeze(0).to(self.device)
+
             while not done:
+
                 holding_history.loc[len(holding_history), holding_history.columns] = {
                     'Date': self.env.date[self.env.current_step], 'Holdings': self.env.stock_owned, 'Cash': self.env.current_cash,
                     'Return': current_return, 'Action': action, 'Reward': reward, 'Shares': self.env.shares}
@@ -82,14 +88,19 @@ class TrainAgent:
                     if action == 1:
                         buy_sell[1] += 1
 
-                next_state = torch.Tensor(states_list).unsqueeze(0).to(self.device)
+                next_state = torch.Tensor(self.env.get_state()).unsqueeze(0).to(self.device)
                 self.agent.remember(state, action, reward, next_state, done)
+
                 state = next_state
+
+
 
                 self.agent.replay()
 
             print({'total_trades': total_trades, 'buy': buy_sell[0], 'sell': buy_sell[1],
                    'total_reward': total_reward / len(self.env.stock_price)})
+            self.agent.loss_history_avg.append(np.mean(self.agent.loss_history))
+            self.agent.loss_history = []
             self.post_episode_actions(total_reward, e)
 
         print("Training done!")
@@ -98,7 +109,9 @@ class TrainAgent:
         if not os.path.exists('results'):
             os.makedirs('results')
 
-        plt.plot(self.agent.loss_history)
+        plt.plot(self.agent.loss_history_avg)
+        plt.xlabel('episodes')
+        plt.ylabel('avg loss')
         plt.savefig('results/loss_hist.png', bbox_inches='tight')
 
     def post_episode_actions(self, total_reward, e):

@@ -5,6 +5,7 @@ from data import DatasetClass, TechnicalIndicators
 from datetime import datetime
 from trading_agent import DQAgent
 
+
 def predict(args):
     symbol = args.symbol
     start_date = args.start_date
@@ -18,9 +19,7 @@ def predict(args):
     df_ta = indicator.run_all_default(stocks_df)
 
     env = TradingEnvironment(df_ta, cash)
-    states_list = [env.cr.iloc[env.current_step], env.volume_oscillator.iloc[env.current_step],
-                   env.bollinger_percent.iloc[env.current_step], env.macd_signal.iloc[env.current_step],
-                   env.current_cash, env.stock_owned]
+    states_list = env.get_state()
 
     agent = DQAgent(input_dim=len(states_list), action_dim=3)
 

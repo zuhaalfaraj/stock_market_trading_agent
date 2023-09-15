@@ -23,15 +23,15 @@ def main(args):
     #scaler = MinMaxScaler()
     #df_ta = pd.DataFrame(scaler.fit_transform(df_ta), columns=df_ta.columns, index=df_ta.index).drop(['Adj Close', 'rsi', 'upper_band', 'lower_band'], axis =1)
     #df_ta = pd.concat([df_ta, org], axis = 1)
-    print(df_ta)
+    #print(df_ta)
     env = TradingEnvironment(df_ta, cash)
-    states_list = [env.cr[env.current_step], env.volume_oscillator[env.current_step],
-                   env.bollinger_percent[env.current_step], env.macd_signal[env.current_step],
-                   env.current_cash, env.stock_owned]
 
-    trading_agent = TrainAgent(env, input_dim=len(states_list), action_dim=3, episodes=args.episodes)
+
+    trading_agent = TrainAgent(env, action_dim=3, episodes=args.episodes,
+                               hidden_dim=args.hidden_dim, gamma=args.gamma,
+                               epsilon=args.epsilon, epsilon_min=args.epsilon_min,
+                               epsilon_decay=args.epsilon_decay, lr=args.lr)
     trading_agent.train()
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Train a trading agent.")
@@ -41,6 +41,14 @@ if __name__ == '__main__':
                         help='End date for training data.')
     parser.add_argument('--cash', type=float, default=10000, help='Initial cash amount.')
     parser.add_argument('--episodes', type=int, default=500, help='Number of training episodes.')
+
+    parser.add_argument('--hidden_dim', type=int, default=128,
+                        help='NN hidden states dim')
+    parser.add_argument('--gamma', type=float, default=0.99, help='Q Learning gamma (discount rate')
+    parser.add_argument('--epsilon', type=float, default=0.9, help='exploration rate')
+    parser.add_argument('--epsilon_decay', type=float, default=0.999, help='Decay rate')
+    parser.add_argument('--epsilon_min', type=float, default=0.01, help='minimum epsilon')
+    parser.add_argument('--lr', type=float, default=1e-5, help='Learning Rate')
 
     args = parser.parse_args()
     main(args)

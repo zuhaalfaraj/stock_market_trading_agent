@@ -2,9 +2,12 @@ import torch
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+import random
+import numpy as np
 
-folder_path = 'path_to_your_directory'
-
+random.seed(0)
+np.random.seed(0)
+torch.manual_seed(0)
 
 class TradingTester:
     def __init__(self, env, agent, data, name, path=None):
@@ -25,15 +28,6 @@ class TradingTester:
     def test_agent(self):
         total_profit = 0
         self.env.reset()
-        states_list = [
-            self.env.cr.iloc[self.env.current_step],
-            self.env.volume_oscillator.iloc[self.env.current_step],
-            self.env.bollinger_percent.iloc[self.env.current_step],
-            self.env.macd_signal.iloc[self.env.current_step],
-            self.env.current_cash,
-            self.env.stock_owned
-        ]
-        state = torch.Tensor(states_list).unsqueeze(0).to(self.device)
         done = False
         holding_history = pd.DataFrame(
             columns=['Date', 'Action', 'Holdings', 'Cash', 'Return', 'total_profit', 'Shares'])
@@ -42,6 +36,8 @@ class TradingTester:
         returns, action, total_profit = self.env.current_cash, None, 0
 
         while not done:
+            states_list = self.env.get_state()
+            state = torch.Tensor(states_list).unsqueeze(0).to(self.device)
             holding_history.loc[len(holding_history), holding_history.columns] = {
                 'Date': self.env.date[self.env.current_step],
                 'Action': action,
@@ -62,8 +58,8 @@ class TradingTester:
             action = self.agent.act(state, available_actions)
             profit, done = self.env.step(action, tracker)
             total_profit += profit
-            state = torch.Tensor(states_list).unsqueeze(0).to(self.device)
             returns = self.env.current_cash + self.env.stock_owned * self.env.stock_price.iloc[self.env.current_step]
+        holding_history.loc[(holding_history['Shares'] == 0 & holding_history['Action'].isin([0,1]))  , 'Action'] = 2
         holding_history.to_csv('results/{}/holding_history.csv'.format(self.name))
         return total_profit, holding_history
 

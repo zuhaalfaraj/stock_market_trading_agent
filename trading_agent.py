@@ -31,7 +31,8 @@ class DQAgent:
         loss_history (list): History of training losses.
     """
 
-    def __init__(self, input_dim, action_dim, hidden_dim=128, gamma=0.99, epsilon=0.5, lr=0.00001):
+    def __init__(self, input_dim, action_dim, hidden_dim=128, gamma=0.99, epsilon=0.9,epsilon_min = 0.01,
+                 epsilon_decay = 0.999, lr=0.0000001):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.q_net = QNetwork(input_dim, action_dim, hidden_dim).to(self.device)
         self.target_net = QNetwork(input_dim, action_dim, hidden_dim).to(self.device)
@@ -44,10 +45,11 @@ class DQAgent:
 
         self.gamma = gamma
         self.epsilon = epsilon
-        self.epsilon_min = 0.01
-        self.epsilon_decay = 0.995
+        self.epsilon_min = epsilon_min
+        self.epsilon_decay =epsilon_decay
 
         self.loss_history = []
+        self.loss_history_avg = []
 
     def remember(self, state, action, reward, next_state, done):
         """
